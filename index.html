@@ -144,8 +144,15 @@
             <h1 id="mainTitle" class="arcade-title text-4xl sm:text-6xl md:text-7xl font-extrabold mb-3 float-anim select-none">
                 All Out Of Options
             </h1>
-            <div id="promptBadge" class="arcade-subtitle text-xs sm:text-sm md:text-base shadow-lg transition-opacity duration-300">
+            <div id="promptBadge" class="arcade-subtitle text-xs sm:text-sm md:text-base shadow-lg transition-opacity duration-300 mb-5">
                 Tap / Swipe Left & Right or Use Arrow Keys to Strike!
+            </div>
+
+            <!-- Start Game Button & Star Power Button -->
+            <div id="startMenuContainer" class="flex flex-col items-center gap-3 interactive">
+                <button id="startBtn" class="arcade-pill px-10 py-3.5 sm:px-12 sm:py-4 text-xl sm:text-2xl bg-[#a3e635] hover:bg-[#84cc16] text-[#191d2b] tracking-wide shadow-[0_7px_0_#191d2b] active:translate-y-1">
+                    ⭐ START GAME
+                </button>
             </div>
 
             <!-- Combo / Action Callout -->
@@ -157,20 +164,25 @@
         <!-- Bottom Controls & Pill Bar -->
         <div class="flex flex-col items-center w-full gap-3">
             <!-- Touch / Click Action Controls for Phone & Laptop -->
-            <div class="flex justify-between items-center w-full max-w-xl gap-3 sm:gap-6 interactive">
+            <div class="flex justify-between items-center w-full max-w-2xl gap-2 sm:gap-4 interactive">
                 <button id="btnLeft" class="control-btn flex-1 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#fef08a] active:bg-[#fde047]">
-                    <span class="text-xl sm:text-2xl leading-none">⬅️ SLASH LEFT</span>
-                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[A / LEFT ARROW]</span>
+                    <span class="text-lg sm:text-2xl leading-none">⬅️ SLASH LEFT</span>
+                    <span class="text-[10px] sm:text-xs text-gray-600 mt-1">[A / LEFT]</span>
                 </button>
 
-                <button id="btnJump" class="control-btn px-5 sm:px-7 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#bae6fd] active:bg-[#7dd3fc]">
-                    <span class="text-xl sm:text-2xl leading-none">⬆️ LEAP</span>
-                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[W / UP / SPACE]</span>
+                <button id="btnJump" class="control-btn px-4 sm:px-6 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#bae6fd] active:bg-[#7dd3fc]">
+                    <span class="text-lg sm:text-2xl leading-none">⬆️ LEAP</span>
+                    <span class="text-[10px] sm:text-xs text-gray-600 mt-1">[W / UP]</span>
+                </button>
+
+                <button id="btnStar" class="control-btn px-4 sm:px-6 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#fed7aa] active:bg-[#fdba74] relative">
+                    <span class="text-lg sm:text-2xl leading-none">⭐ STAR</span>
+                    <span id="starCountText" class="text-[10px] sm:text-xs text-gray-700 mt-1">READY (1)</span>
                 </button>
 
                 <button id="btnRight" class="control-btn flex-1 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#fef08a] active:bg-[#fde047]">
-                    <span class="text-xl sm:text-2xl leading-none">SLASH RIGHT ➡️</span>
-                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[D / RIGHT ARROW]</span>
+                    <span class="text-lg sm:text-2xl leading-none">SLASH RIGHT ➡️</span>
+                    <span class="text-[10px] sm:text-xs text-gray-600 mt-1">[D / RIGHT]</span>
                 </button>
             </div>
 
@@ -268,6 +280,9 @@
                 hitSynth.triggerAttackRelease("C1", "8n", now);
             } else if (type === 'wave') {
                 synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n", now);
+            } else if (type === 'star') {
+                synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now);
+                hitSynth.triggerAttackRelease("C2", "8n", now);
             }
         } catch (e) {}
     }
@@ -292,6 +307,7 @@
     let highScore = 0;
     let wave = 1;
     let combo = 0;
+    let starCharges = 1;
     let maxHealth = 3;
     let health = 3;
     let isGameOver = false;
@@ -350,6 +366,17 @@
         document.getElementById('scoreDisplay').textContent = score;
         document.getElementById('waveDisplay').textContent = 'W' + wave;
 
+        // Update Star Button state
+        const btnStar = document.getElementById('btnStar');
+        const starCountText = document.getElementById('starCountText');
+        if (starCharges > 0) {
+            starCountText.textContent = `READY (${starCharges}) [S]`;
+            btnStar.style.opacity = '1';
+        } else {
+            starCountText.textContent = '5 KILLS TO CHARGE';
+            btnStar.style.opacity = '0.55';
+        }
+
         const hc = document.getElementById('healthContainer');
         hc.innerHTML = '';
         for (let i = 0; i < maxHealth; i++) {
@@ -372,6 +399,63 @@
         } else {
             comboBadge.style.opacity = '0';
         }
+    }
+
+    function startGame() {
+        initAudio();
+        if (!gameStarted) {
+            gameStarted = true;
+            document.getElementById('mainTitle').style.opacity = '0.18';
+            document.getElementById('promptBadge').style.opacity = '0';
+            document.getElementById('startMenuContainer').style.display = 'none';
+            playSound('wave');
+            createBurst(samurai.x, samurai.y - 30, '#a3e635', 16);
+            addFloatingText('FIGHT!', samurai.x, samurai.y - 90, '#a3e635');
+        }
+    }
+
+    function triggerStarBlast() {
+        if (isGameOver) return;
+        if (!gameStarted) startGame();
+
+        if (starCharges <= 0) {
+            addFloatingText('NEED 5 KILLS!', samurai.x, samurai.y - 80, '#facc15');
+            return;
+        }
+
+        starCharges--;
+        screenShake = 18;
+        playSound('star');
+
+        // Dual directional golden slash arcs
+        slashArcs.push({ x: samurai.x - 50, y: samurai.y - 38, dir: -1, life: 0.28, maxLife: 0.28 });
+        slashArcs.push({ x: samurai.x + 50, y: samurai.y - 38, dir: 1, life: 0.28, maxLife: 0.28 });
+
+        createBurst(samurai.x, samurai.y - 40, '#facc15', 28);
+        addFloatingText('⭐ STAR BURST! ⭐', samurai.x, samurai.y - 110, '#facc15');
+
+        // Defeat all active enemies on the beam!
+        enemies.forEach(en => {
+            if (!en.dead) {
+                const dir = en.x < samurai.x ? -1 : 1;
+                en.dead = true;
+                en.vx = dir * 380;
+                en.vy = -420;
+                en.rotSpeed = dir * 12;
+                score++;
+                combo++;
+                createBurst(en.x, en.y - 40, '#facc15', 12);
+            }
+        });
+
+        // Deflect all spears
+        spears.forEach(sp => {
+            sp.deflected = true;
+            sp.vx = -sp.vx * 1.4;
+            sp.vy = -300;
+        });
+
+        updateHUD();
     }
 
     function addFloatingText(text, x, y, color = '#ffffff') {
@@ -408,13 +492,7 @@
     // ==========================================
     function triggerStrike(dir) {
         if (isGameOver) return;
-        initAudio();
-
-        if (!gameStarted) {
-            gameStarted = true;
-            document.getElementById('mainTitle').style.opacity = '0.18';
-            document.getElementById('promptBadge').style.opacity = '0';
-        }
+        if (!gameStarted) startGame();
 
         samurai.facing = dir;
         samurai.state = 'slash';
@@ -457,10 +535,15 @@
                     score++;
                     combo++;
 
+                    if (score > 0 && score % 5 === 0) {
+                        starCharges = Math.min(3, starCharges + 1);
+                        addFloatingText('⭐ +1 STAR!', samurai.x, samurai.y - 105, '#facc15');
+                    }
+
                     if (score > 0 && score % 10 === 0) {
                         wave++;
                         playSound('wave');
-                        addFloatingText(`WAVE ${wave}!`, samurai.x, samurai.y - 120, '#a3e635');
+                        addFloatingText(`WAVE ${wave}!`, samurai.x, samurai.y - 130, '#a3e635');
                     }
 
                     createBurst(en.x, en.y - 40, '#a3e635', 14);
@@ -505,13 +588,7 @@
 
     function triggerJump() {
         if (isGameOver) return;
-        initAudio();
-
-        if (!gameStarted) {
-            gameStarted = true;
-            document.getElementById('mainTitle').style.opacity = '0.18';
-            document.getElementById('promptBadge').style.opacity = '0';
-        }
+        if (!gameStarted) startGame();
 
         if (samurai.y >= beamY - 2) {
             samurai.vy = -540;
@@ -587,6 +664,9 @@
         } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
             document.getElementById('btnJump').classList.add('pressed');
             triggerJump();
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown' || e.key === 'Enter') {
+            document.getElementById('btnStar').classList.add('pressed');
+            triggerStarBlast();
         }
     });
 
@@ -597,10 +677,16 @@
             document.getElementById('btnRight').classList.remove('pressed');
         } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
             document.getElementById('btnJump').classList.remove('pressed');
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown' || e.key === 'Enter') {
+            document.getElementById('btnStar').classList.remove('pressed');
         }
     });
 
     // Button Listeners
+    document.getElementById('startBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        startGame();
+    });
     document.getElementById('btnLeft').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         triggerStrike(-1);
@@ -612,6 +698,10 @@
     document.getElementById('btnJump').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         triggerJump();
+    });
+    document.getElementById('btnStar').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        triggerStarBlast();
     });
 
     // Canvas Direct Tap / Flick Gesture (Like Cup Pong "Drag / Flick to Shoot")
@@ -649,8 +739,10 @@
         score = 0;
         wave = 1;
         combo = 0;
+        starCharges = 1;
         health = maxHealth;
         isGameOver = false;
+        gameStarted = false;
         enemies = [];
         spears = [];
         particles = [];
@@ -660,8 +752,48 @@
         samurai.vy = 0;
         samurai.state = 'crouch';
         samurai.invulnTimer = 0;
+        document.getElementById('mainTitle').style.opacity = '1';
+        document.getElementById('promptBadge').style.opacity = '1';
+        document.getElementById('startMenuContainer').style.display = 'flex';
         document.getElementById('gameOverModal').classList.add('hidden');
         document.getElementById('gameOverModal').classList.remove('flex');
+
+        // Re-populate initial flanking enemies from Image 2
+        enemies.push({
+            x: beamStartX + 90,
+            y: beamY,
+            vy: 0,
+            vx: 0,
+            side: -1,
+            type: 'brawler',
+            hp: 1,
+            maxHp: 1,
+            speed: 95,
+            stunTimer: 0.4,
+            attackCooldown: 1.5,
+            dead: false,
+            rot: 0,
+            rotSpeed: 0,
+            animPhase: 0
+        });
+        enemies.push({
+            x: beamEndX - 95,
+            y: beamY,
+            vy: 0,
+            vx: 0,
+            side: 1,
+            type: 'spearGuard',
+            hp: 1,
+            maxHp: 1,
+            speed: 90,
+            stunTimer: 0.4,
+            attackCooldown: 1.5,
+            dead: false,
+            rot: 0,
+            rotSpeed: 0,
+            animPhase: 2
+        });
+
         updateHUD();
     }
 
@@ -740,7 +872,27 @@
             }
         }
 
-        if (isGameOver) return;
+        // Update Particles & Floating Texts even before game starts
+        for (let i = slashArcs.length - 1; i >= 0; i--) {
+            slashArcs[i].life -= dt;
+            if (slashArcs[i].life <= 0) slashArcs.splice(i, 1);
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 500 * dt;
+            p.life -= dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.y += ft.vy * dt;
+            ft.life -= dt;
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+
+        if (isGameOver || !gameStarted) return;
 
         // Spawn Enemies
         spawnTimer -= dt;
@@ -825,30 +977,6 @@
             if (sp.x < -100 || sp.x > W + 100 || sp.y > H + 100) {
                 spears.splice(i, 1);
             }
-        }
-
-        // Update Slash Arcs
-        for (let i = slashArcs.length - 1; i >= 0; i--) {
-            slashArcs[i].life -= dt;
-            if (slashArcs[i].life <= 0) slashArcs.splice(i, 1);
-        }
-
-        // Update Particles
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vy += 500 * dt;
-            p.life -= dt;
-            if (p.life <= 0) particles.splice(i, 1);
-        }
-
-        // Update Floating Texts
-        for (let i = floatingTexts.length - 1; i >= 0; i--) {
-            const ft = floatingTexts[i];
-            ft.y += ft.vy * dt;
-            ft.life -= dt;
-            if (ft.life <= 0) floatingTexts.splice(i, 1);
         }
     }
 
