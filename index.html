@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>All Out Of Options - Sky Beam Showdown</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            background-color: #161824;
+            touch-action: none;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        /* Cup Pong Reference Style UI Elements */
+        .arcade-pill {
+            background: #ffffff;
+            border: 3.5px solid #191d2b;
+            border-radius: 9999px;
+            box-shadow: 0 5px 0 #191d2b;
+            color: #191d2b;
+            font-weight: 800;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .arcade-pill:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #191d2b;
+        }
+        .arcade-title {
+            color: #ffffff;
+            -webkit-text-stroke: 7px #191d2b;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 7px 0px #191d2b);
+            letter-spacing: 0.02em;
+        }
+        .arcade-subtitle {
+            background: rgba(25, 29, 43, 0.85);
+            color: #ffffff;
+            border-radius: 9999px;
+            padding: 6px 18px;
+            font-weight: 700;
+            border: 2px solid #191d2b;
+        }
+        .ui-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px 22px;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        .control-btn {
+            background: #ffffff;
+            border: 4px solid #191d2b;
+            border-radius: 24px;
+            box-shadow: 0 6px 0 #191d2b;
+            color: #191d2b;
+            font-weight: 800;
+            transition: all 0.07s ease;
+            cursor: pointer;
+        }
+        .control-btn:active, .control-btn.pressed {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #191d2b;
+            background: #e2e8f0;
+        }
+        @keyframes floatTitle {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+        .float-anim {
+            animation: floatTitle 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD & UI Layer styled directly after the 3rd reference image -->
+    <div class="ui-layer">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-start w-full">
+            <!-- Score / Wave Pill (Top Left like Cup Pong 0 - 0) -->
+            <div class="arcade-pill px-5 py-2 text-lg sm:text-xl interactive gap-2">
+                <span class="text-[#84cc16]" id="scoreDisplay">0</span>
+                <span class="text-gray-400">-</span>
+                <span class="text-[#38bdf8]" id="waveDisplay">W1</span>
+            </div>
+
+            <!-- Hearts / Stamina Center Top -->
+            <div id="healthContainer" class="flex gap-2 mt-1">
+                <!-- Populated by JS -->
+            </div>
+
+            <!-- Reset / Exit Button (Top Right like Cup Pong EXIT) -->
+            <button id="resetBtn" class="arcade-pill px-5 py-2 text-sm sm:text-base uppercase tracking-wider interactive">
+                RESET
+            </button>
+        </div>
+
+        <!-- Center Overlay (Title & Prompt) -->
+        <div class="flex flex-col items-center justify-center my-auto text-center pointer-events-none">
+            <h1 id="mainTitle" class="arcade-title text-4xl sm:text-6xl md:text-7xl font-extrabold mb-3 float-anim select-none">
+                All Out Of Options
+            </h1>
+            <div id="promptBadge" class="arcade-subtitle text-xs sm:text-sm md:text-base shadow-lg transition-opacity duration-300">
+                Tap / Swipe Left & Right or Use Arrow Keys to Strike!
+            </div>
+
+            <!-- Combo / Action Callout -->
+            <div id="comboBadge" class="mt-3 opacity-0 transition-transform duration-150 scale-90">
+                <span class="arcade-title text-2xl sm:text-4xl text-[#facc15]" id="comboText">x5 COMBO!</span>
+            </div>
+        </div>
+
+        <!-- Bottom Controls & Pill Bar -->
+        <div class="flex flex-col items-center w-full gap-3">
+            <!-- Touch / Click Action Controls for Phone & Laptop -->
+            <div class="flex justify-between items-center w-full max-w-xl gap-3 sm:gap-6 interactive">
+                <button id="btnLeft" class="control-btn flex-1 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#fef08a] active:bg-[#fde047]">
+                    <span class="text-xl sm:text-2xl leading-none">⬅️ SLASH LEFT</span>
+                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[A / LEFT ARROW]</span>
+                </button>
+
+                <button id="btnJump" class="control-btn px-5 sm:px-7 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#bae6fd] active:bg-[#7dd3fc]">
+                    <span class="text-xl sm:text-2xl leading-none">⬆️ LEAP</span>
+                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[W / UP / SPACE]</span>
+                </button>
+
+                <button id="btnRight" class="control-btn flex-1 py-3.5 sm:py-4 flex flex-col items-center justify-center bg-[#fef08a] active:bg-[#fde047]">
+                    <span class="text-xl sm:text-2xl leading-none">SLASH RIGHT ➡️</span>
+                    <span class="text-[11px] sm:text-xs text-gray-600 mt-1">[D / RIGHT ARROW]</span>
+                </button>
+            </div>
+
+            <!-- Bottom Center Utility Pills (Sound & Mode like Cup Pong) -->
+            <div class="flex gap-3 interactive">
+                <button id="soundBtn" class="arcade-pill px-4 py-1.5 text-xs sm:text-sm gap-1.5">
+                    <span id="soundIcon">🔊</span>
+                    <span id="soundText">Sound</span>
+                </button>
+                <button id="modeBtn" class="arcade-pill px-4 py-1.5 text-xs sm:text-sm gap-1.5">
+                    <span>⚔️</span>
+                    <span id="modeText">Normal Speed</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="fixed inset-0 z-30 bg-black/60 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white border-4 border-[#191d2b] rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-[0_10px_0_#191d2b] transform transition-all">
+            <h2 id="modalTitle" class="arcade-title text-4xl sm:text-5xl mb-2">SURROUNDED!</h2>
+            <p class="text-[#191d2b] font-bold text-sm sm:text-base mb-5">The tribal baboon warriors overwhelmed the beam!</p>
+            
+            <div class="bg-[#f1f5f9] border-3 border-[#191d2b] rounded-2xl p-4 mb-6 flex justify-around">
+                <div>
+                    <div class="text-xs text-gray-500 font-bold uppercase">Defeated</div>
+                    <div id="finalScore" class="text-3xl font-extrabold text-[#84cc16]">0</div>
+                </div>
+                <div class="border-r-2 border-gray-300"></div>
+                <div>
+                    <div class="text-xs text-gray-500 font-bold uppercase">Best Score</div>
+                    <div id="bestScore" class="text-3xl font-extrabold text-[#38bdf8]">0</div>
+                </div>
+            </div>
+
+            <button id="playAgainBtn" class="arcade-pill w-full py-3.5 text-lg bg-[#a3e635] hover:bg-[#84cc16] text-[#191d2b]">
+                FIGHT AGAIN
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // SOUND ENGINE (Web Audio API / Tone.js)
+    // ==========================================
+    let soundEnabled = true;
+    let audioReady = false;
+    let synth, hitSynth, jumpSynth, hurtSynth;
+
+    async function initAudio() {
+        if (audioReady) return;
+        try {
+            await Tone.start();
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.1 }
+            }).toDestination();
+
+            hitSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.03,
+                octaves: 4,
+                envelope: { attack: 0.001, decay: 0.18, sustain: 0 }
+            }).toDestination();
+
+            jumpSynth = new Tone.Synth({
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.1 }
+            }).toDestination();
+
+            hurtSynth = new Tone.NoiseSynth({
+                noise: { type: "brown" },
+                envelope: { attack: 0.005, decay: 0.25, sustain: 0 }
+            }).toDestination();
+
+            audioReady = true;
+        } catch (e) {
+            console.warn("Audio init skipped:", e);
+        }
+    }
+
+    function playSound(type) {
+        if (!soundEnabled || !audioReady) return;
+        try {
+            const now = Tone.now();
+            if (type === 'slash') {
+                synth.triggerAttackRelease(["C5", "G5"], "32n", now);
+            } else if (type === 'hit') {
+                hitSynth.triggerAttackRelease("G2", "16n", now);
+                synth.triggerAttackRelease(["E5", "A5"], "32n", now + 0.02);
+            } else if (type === 'jump') {
+                jumpSynth.triggerAttackRelease("D5", "16n", now);
+            } else if (type === 'hurt') {
+                hurtSynth.triggerAttackRelease("8n", now);
+                hitSynth.triggerAttackRelease("C1", "8n", now);
+            } else if (type === 'wave') {
+                synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n", now);
+            }
+        } catch (e) {}
+    }
+
+    // ==========================================
+    // GAME SETUP & STATE
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+
+    // Platform & Geometry variables
+    let beamY = 0;
+    let beamStartX = 0;
+    let beamEndX = 0;
+    let pillarX = 0;
+
+    // Game State
+    let score = 0;
+    let highScore = 0;
+    let wave = 1;
+    let combo = 0;
+    let maxHealth = 3;
+    let health = 3;
+    let isGameOver = false;
+    let fastMode = false;
+    let screenShake = 0;
+    let gameStarted = false;
+
+    // Entities
+    const samurai = {
+        x: 0,
+        y: 0,
+        vy: 0,
+        facing: 1, // -1 left, 1 right
+        state: 'crouch', // 'crouch', 'slash', 'jump', 'hurt'
+        stateTimer: 0,
+        slashReach: 145,
+        invulnTimer: 0,
+        animTick: 0
+    };
+
+    let enemies = [];
+    let spears = [];
+    let particles = [];
+    let slashArcs = [];
+    let floatingTexts = [];
+    let spawnTimer = 1.0;
+
+    // Resize Handler
+    function resizeCanvas() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+
+        // Position main horizontal beam based on screen size
+        beamY = H * 0.63;
+        pillarX = W * 0.84;
+        beamStartX = W * 0.05;
+        beamEndX = pillarX;
+
+        if (!gameStarted) {
+            samurai.x = (beamStartX + beamEndX) * 0.46;
+            samurai.y = beamY;
+        } else {
+            samurai.x = Math.max(beamStartX + 60, Math.min(beamEndX - 60, samurai.x));
+            if (samurai.y > beamY) samurai.y = beamY;
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ==========================================
+    // HUD MANAGEMENT
+    // ==========================================
+    function updateHUD() {
+        document.getElementById('scoreDisplay').textContent = score;
+        document.getElementById('waveDisplay').textContent = 'W' + wave;
+
+        const hc = document.getElementById('healthContainer');
+        hc.innerHTML = '';
+        for (let i = 0; i < maxHealth; i++) {
+            const heart = document.createElement('div');
+            heart.className = 'arcade-pill w-9 h-9 sm:w-10 sm:h-10 text-base sm:text-lg flex items-center justify-center transition-transform ' +
+                (i < health ? 'bg-[#fecdd3] scale-100' : 'bg-gray-200 opacity-50 scale-90');
+            heart.innerHTML = i < health ? '❤️' : '🖤';
+            hc.appendChild(heart);
+        }
+
+        const comboBadge = document.getElementById('comboBadge');
+        const comboText = document.getElementById('comboText');
+        if (combo >= 3) {
+            comboText.textContent = `x${combo} COMBO!`;
+            comboBadge.style.opacity = '1';
+            comboBadge.style.transform = 'scale(1.08)';
+            setTimeout(() => {
+                comboBadge.style.transform = 'scale(1)';
+            }, 90);
+        } else {
+            comboBadge.style.opacity = '0';
+        }
+    }
+
+    function addFloatingText(text, x, y, color = '#ffffff') {
+        floatingTexts.push({
+            text,
+            x,
+            y,
+            vy: -90,
+            life: 0.75,
+            maxLife: 0.75,
+            color
+        });
+    }
+
+    function createBurst(x, y, color, count = 12) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 70 + Math.random() * 220;
+            particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 60,
+                size: 5 + Math.random() * 7,
+                color,
+                life: 0.35 + Math.random() * 0.25,
+                maxLife: 0.6
+            });
+        }
+    }
+
+    // ==========================================
+    // PLAYER ACTIONS (Surrounded Samurai)
+    // ==========================================
+    function triggerStrike(dir) {
+        if (isGameOver) return;
+        initAudio();
+
+        if (!gameStarted) {
+            gameStarted = true;
+            document.getElementById('mainTitle').style.opacity = '0.18';
+            document.getElementById('promptBadge').style.opacity = '0';
+        }
+
+        samurai.facing = dir;
+        samurai.state = 'slash';
+        samurai.stateTimer = 0.22;
+
+        // Dash slightly toward target direction while staying safe on the beam
+        const dashStep = 34 * dir;
+        samurai.x = Math.max(beamStartX + 75, Math.min(beamEndX - 75, samurai.x + dashStep));
+
+        // Visual cartoon slash arc
+        slashArcs.push({
+            x: samurai.x + dir * 45,
+            y: samurai.y - 38,
+            dir: dir,
+            life: 0.18,
+            maxLife: 0.18
+        });
+
+        let hitAny = false;
+        const strikeRange = Math.min(185, Math.max(135, W * 0.17));
+
+        // Check enemy hits in that direction
+        enemies.forEach(en => {
+            if (en.dead) return;
+            const dx = en.x - samurai.x;
+            const sameSide = (dir === -1 && dx <= 25 && dx >= -strikeRange) ||
+                             (dir === 1 && dx >= -25 && dx <= strikeRange);
+            const verticalDist = Math.abs(en.y - samurai.y);
+
+            if (sameSide && verticalDist < 95) {
+                en.hp -= 1;
+                hitAny = true;
+                screenShake = 8;
+
+                if (en.hp <= 0) {
+                    en.dead = true;
+                    en.vx = dir * (280 + Math.random() * 140);
+                    en.vy = -340 - Math.random() * 100;
+                    en.rotSpeed = dir * 9;
+                    score++;
+                    combo++;
+
+                    if (score > 0 && score % 10 === 0) {
+                        wave++;
+                        playSound('wave');
+                        addFloatingText(`WAVE ${wave}!`, samurai.x, samurai.y - 120, '#a3e635');
+                    }
+
+                    createBurst(en.x, en.y - 40, '#a3e635', 14);
+                    createBurst(en.x, en.y - 40, '#ffffff', 6);
+                    addFloatingText('KO!', en.x, en.y - 75, '#facc15');
+                } else {
+                    // Shielded / Double-spear warrior knocked back
+                    en.x += dir * 95;
+                    en.stunTimer = 0.35;
+                    createBurst(en.x, en.y - 40, '#38bdf8', 10);
+                    addFloatingText('CLANG!', en.x, en.y - 75, '#38bdf8');
+                }
+            }
+        });
+
+        // Also deflect flying spears!
+        spears.forEach(sp => {
+            if (sp.deflected) return;
+            const dx = sp.x - samurai.x;
+            const sameSide = (dir === -1 && dx <= 20 && dx >= -strikeRange) ||
+                             (dir === 1 && dx >= -20 && dx <= strikeRange);
+            if (sameSide && Math.abs(sp.y - (samurai.y - 36)) < 70) {
+                sp.deflected = true;
+                sp.vx = -sp.vx * 1.2;
+                sp.vy = -260;
+                hitAny = true;
+                score++;
+                combo++;
+                createBurst(sp.x, sp.y, '#facc15', 10);
+                addFloatingText('PARRY!', sp.x, sp.y - 25, '#a3e635');
+            }
+        });
+
+        if (hitAny) {
+            playSound('hit');
+        } else {
+            playSound('slash');
+        }
+
+        updateHUD();
+    }
+
+    function triggerJump() {
+        if (isGameOver) return;
+        initAudio();
+
+        if (!gameStarted) {
+            gameStarted = true;
+            document.getElementById('mainTitle').style.opacity = '0.18';
+            document.getElementById('promptBadge').style.opacity = '0';
+        }
+
+        if (samurai.y >= beamY - 2) {
+            samurai.vy = -540;
+            samurai.state = 'jump';
+            playSound('jump');
+            createBurst(samurai.x, samurai.y, '#ffffff', 8);
+
+            // Jumping shockwave knocks back super close enemies slightly
+            enemies.forEach(en => {
+                if (!en.dead && Math.abs(en.x - samurai.x) < 110) {
+                    const pushDir = en.x < samurai.x ? -1 : 1;
+                    en.x += pushDir * 60;
+                    en.stunTimer = 0.25;
+                }
+            });
+        }
+    }
+
+    // ==========================================
+    // ENEMY SPAWNING (Image 1 & 2 Tribal Apes)
+    // ==========================================
+    function spawnEnemy() {
+        const side = Math.random() < 0.5 ? -1 : 1; // -1 spawns on left spire, 1 spawns on right pillar
+        const spawnX = side === -1 ? beamStartX + 18 : beamEndX - 18;
+
+        // Types inspired by Image 1 & 2:
+        // 'brawler' (left monkey in image 2), 'spearGuard' (right monkey in image 2 with twin red spears), 'thrower'
+        const roll = Math.random();
+        let type = 'brawler';
+        let hp = 1;
+        let speed = (105 + wave * 12 + Math.random() * 35) * (fastMode ? 1.3 : 1);
+
+        if (roll > 0.68 && wave >= 1) {
+            type = 'spearGuard';
+            hp = wave >= 3 ? 2 : 1;
+            speed *= 0.85;
+        } else if (roll > 0.45 && wave >= 2) {
+            type = 'thrower';
+            hp = 1;
+            speed *= 0.75;
+        }
+
+        enemies.push({
+            x: spawnX,
+            y: beamY - 260, // Drop down from the tall spikes like an ambush
+            vy: 0,
+            vx: 0,
+            side: side, // -1 comes from left, 1 comes from right
+            type: type,
+            hp: hp,
+            maxHp: hp,
+            speed: speed,
+            stunTimer: 0,
+            attackCooldown: 1.4 + Math.random(),
+            dead: false,
+            rot: 0,
+            rotSpeed: 0,
+            animPhase: Math.random() * 10
+        });
+    }
+
+    // ==========================================
+    // CONTROLS (Keyboard, Touch Buttons & Swipe)
+    // ==========================================
+    window.addEventListener('keydown', (e) => {
+        if (e.repeat) return;
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            document.getElementById('btnLeft').classList.add('pressed');
+            triggerStrike(-1);
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            document.getElementById('btnRight').classList.add('pressed');
+            triggerStrike(1);
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+            document.getElementById('btnJump').classList.add('pressed');
+            triggerJump();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            document.getElementById('btnLeft').classList.remove('pressed');
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            document.getElementById('btnRight').classList.remove('pressed');
+        } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+            document.getElementById('btnJump').classList.remove('pressed');
+        }
+    });
+
+    // Button Listeners
+    document.getElementById('btnLeft').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        triggerStrike(-1);
+    });
+    document.getElementById('btnRight').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        triggerStrike(1);
+    });
+    document.getElementById('btnJump').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        triggerJump();
+    });
+
+    // Canvas Direct Tap / Flick Gesture (Like Cup Pong "Drag / Flick to Shoot")
+    let pointerStartX = null;
+    let pointerStartY = null;
+
+    canvas.addEventListener('pointerdown', (e) => {
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+        if (pointerStartX === null) return;
+        const dx = e.clientX - pointerStartX;
+        const dy = e.clientY - pointerStartY;
+
+        if (Math.abs(dy) > 45 && dy < -45 && Math.abs(dy) > Math.abs(dx)) {
+            triggerJump();
+        } else if (Math.abs(dx) > 30) {
+            triggerStrike(dx < 0 ? -1 : 1);
+        } else {
+            // Simple tap on left or right half of screen
+            if (e.clientX < W * 0.5) {
+                triggerStrike(-1);
+            } else {
+                triggerStrike(1);
+            }
+        }
+        pointerStartX = null;
+        pointerStartY = null;
+    });
+
+    // Top & Bottom Utility Buttons
+    function resetGame() {
+        score = 0;
+        wave = 1;
+        combo = 0;
+        health = maxHealth;
+        isGameOver = false;
+        enemies = [];
+        spears = [];
+        particles = [];
+        floatingTexts = [];
+        samurai.x = (beamStartX + beamEndX) * 0.46;
+        samurai.y = beamY;
+        samurai.vy = 0;
+        samurai.state = 'crouch';
+        samurai.invulnTimer = 0;
+        document.getElementById('gameOverModal').classList.add('hidden');
+        document.getElementById('gameOverModal').classList.remove('flex');
+        updateHUD();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+    document.getElementById('playAgainBtn').addEventListener('click', resetGame);
+
+    document.getElementById('soundBtn').addEventListener('click', () => {
+        initAudio();
+        soundEnabled = !soundEnabled;
+        document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+        document.getElementById('soundText').textContent = soundEnabled ? 'Sound' : 'Muted';
+    });
+
+    document.getElementById('modeBtn').addEventListener('click', () => {
+        fastMode = !fastMode;
+        document.getElementById('modeText').textContent = fastMode ? 'Turbo Speed' : 'Normal Speed';
+    });
+
+    // ==========================================
+    // GAME UPDATE LOOP
+    // ==========================================
+    function takeDamage() {
+        if (samurai.invulnTimer > 0 || isGameOver) return;
+        health--;
+        combo = 0;
+        samurai.invulnTimer = 1.1;
+        samurai.state = 'hurt';
+        samurai.stateTimer = 0.35;
+        screenShake = 14;
+        playSound('hurt');
+        createBurst(samurai.x, samurai.y - 35, '#ef4444', 18);
+        addFloatingText('OUCH!', samurai.x, samurai.y - 85, '#ef4444');
+        updateHUD();
+
+        // Push nearby enemies back slightly to give breathing room
+        enemies.forEach(en => {
+            if (!en.dead && Math.abs(en.x - samurai.x) < 130) {
+                const dir = en.x < samurai.x ? -1 : 1;
+                en.x += dir * 110;
+            }
+        });
+
+        if (health <= 0) {
+            isGameOver = true;
+            highScore = Math.max(highScore, score);
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('bestScore').textContent = highScore;
+            const modal = document.getElementById('gameOverModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    function update(dt) {
+        if (screenShake > 0) {
+            screenShake = Math.max(0, screenShake - dt * 35);
+        }
+
+        samurai.animTick += dt * 6;
+        if (samurai.invulnTimer > 0) samurai.invulnTimer -= dt;
+        if (samurai.stateTimer > 0) {
+            samurai.stateTimer -= dt;
+            if (samurai.stateTimer <= 0 && samurai.y >= beamY) {
+                samurai.state = 'crouch';
+            }
+        }
+
+        // Samurai Jump Physics
+        if (samurai.y < beamY || samurai.vy !== 0) {
+            samurai.y += samurai.vy * dt;
+            samurai.vy += 1450 * dt; // Gravity
+            if (samurai.y >= beamY) {
+                samurai.y = beamY;
+                samurai.vy = 0;
+                samurai.state = 'crouch';
+            }
+        }
+
+        if (isGameOver) return;
+
+        // Spawn Enemies
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+            spawnEnemy();
+            const baseInterval = Math.max(0.55, 1.65 - wave * 0.11);
+            spawnTimer = fastMode ? baseInterval * 0.72 : baseInterval;
+        }
+
+        // Update Enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const en = enemies[i];
+            en.animPhase += dt * 10;
+
+            if (en.dead) {
+                en.x += en.vx * dt;
+                en.y += en.vy * dt;
+                en.vy += 1200 * dt;
+                en.rot += en.rotSpeed * dt;
+                if (en.y > H + 150) enemies.splice(i, 1);
+                continue;
+            }
+
+            // Drop onto beam if spawning from upper spire
+            if (en.y < beamY) {
+                en.vy += 1300 * dt;
+                en.y += en.vy * dt;
+                if (en.y >= beamY) {
+                    en.y = beamY;
+                    en.vy = 0;
+                }
+                continue;
+            }
+
+            if (en.stunTimer > 0) {
+                en.stunTimer -= dt;
+                continue;
+            }
+
+            const distToSamurai = samurai.x - en.x;
+            const dirToSamurai = Math.sign(distToSamurai);
+
+            // Spear thrower stops at medium distance and tosses a spear
+            if (en.type === 'thrower' && Math.abs(distToSamurai) < 280 && Math.abs(distToSamurai) > 130) {
+                en.attackCooldown -= dt;
+                if (en.attackCooldown <= 0) {
+                    en.attackCooldown = 2.1;
+                    spears.push({
+                        x: en.x,
+                        y: en.y - 42,
+                        vx: dirToSamurai * 340,
+                        vy: -40,
+                        deflected: false
+                    });
+                }
+            } else {
+                // Advance toward the surrounded samurai
+                en.x += dirToSamurai * en.speed * dt;
+            }
+
+            // Check collision with samurai
+            if (Math.abs(en.x - samurai.x) < 38 && Math.abs(en.y - samurai.y) < 48) {
+                takeDamage();
+            }
+        }
+
+        // Update Flying Spears
+        for (let i = spears.length - 1; i >= 0; i--) {
+            const sp = spears[i];
+            sp.x += sp.vx * dt;
+            sp.y += sp.vy * dt;
+            if (sp.deflected) {
+                sp.vy += 900 * dt;
+            }
+
+            if (!sp.deflected && Math.abs(sp.x - samurai.x) < 28 && Math.abs(sp.y - (samurai.y - 34)) < 34) {
+                takeDamage();
+                spears.splice(i, 1);
+                continue;
+            }
+
+            if (sp.x < -100 || sp.x > W + 100 || sp.y > H + 100) {
+                spears.splice(i, 1);
+            }
+        }
+
+        // Update Slash Arcs
+        for (let i = slashArcs.length - 1; i >= 0; i--) {
+            slashArcs[i].life -= dt;
+            if (slashArcs[i].life <= 0) slashArcs.splice(i, 1);
+        }
+
+        // Update Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 500 * dt;
+            p.life -= dt;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Update Floating Texts
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.y += ft.vy * dt;
+            ft.life -= dt;
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+    }
+
+    // ==========================================
+    // RENDER ENGINE (Image 1+2 Concept + Image 3 Style)
+    // ==========================================
+    function drawBackground() {
+        // Vibrant radial striped upper sky inspired by Cup Pong's striped wall + Image 1's sunset crimson-orange
+        const centerX = W * 0.5;
+        const horizonY = beamY + 35;
+
+        // Base sky gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+        skyGrad.addColorStop(0, '#ff5e4d');
+        skyGrad.addColorStop(0.55, '#ff8052');
+        skyGrad.addColorStop(1, '#ffb076');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, W, horizonY);
+
+        // Subtle Cup-Pong-style radial sunbeams in the sky
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        const numRays = 16;
+        for (let i = 0; i < numRays; i += 2) {
+            const a1 = (i / numRays) * Math.PI * 2;
+            const a2 = ((i + 1) / numRays) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, horizonY);
+            ctx.arc(centerX, horizonY, Math.max(W, H) * 1.3, a1, a2);
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // Lower abyss / fog deck (matches Image 1 & 2 lower hazy canyon + Image 3 clean floor division)
+        const abyssGrad = ctx.createLinearGradient(0, horizonY, 0, H);
+        abyssGrad.addColorStop(0, '#e09f7d');
+        abyssGrad.addColorStop(0.3, '#9d756b');
+        abyssGrad.addColorStop(1, '#3b3344');
+        ctx.fillStyle = abyssGrad;
+        ctx.fillRect(0, horizonY, W, H - horizonY);
+
+        // Horizon divider line
+        ctx.strokeStyle = 'rgba(25, 29, 43, 0.25)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, horizonY);
+        ctx.lineTo(W, horizonY);
+        ctx.stroke();
+    }
+
+    function drawSpireSpike(x, baseY, height, baseWidth) {
+        ctx.fillStyle = '#191d2b';
+        ctx.beginPath();
+        ctx.moveTo(x - baseWidth / 2, baseY);
+        ctx.lineTo(x + 2, baseY - height);
+        ctx.lineTo(x + baseWidth / 2, baseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Crisp highlight line on edge like Cup Pong table lines
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - baseWidth / 2 + 2, baseY);
+        ctx.lineTo(x + 2, baseY - height);
+        ctx.stroke();
+
+        // Glowing orange industrial slots near the base (from Image 1 & 2)
+        ctx.fillStyle = '#ff6b4a';
+        for (let j = 0; j < 3; j++) {
+            ctx.fillRect(x - 3, baseY - 18 - j * 10, 6, 5);
+        }
+    }
+
+    function drawTowerStructure() {
+        // 1. Main Vertical Megastructure Pillar on the Right (from Image 1)
+        const pillarW = Math.max(20, W * 0.022);
+        ctx.fillStyle = '#191d2b';
+        ctx.fillRect(pillarX - pillarW / 2, 0, pillarW, H);
+
+        // White arcade trim along the pillar
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(pillarX - pillarW / 2 + 3, 0, 2.5, H);
+
+        // Glowing lights on main vertical shaft
+        ctx.fillStyle = '#ff7b54';
+        for (let y = 80; y < H - 80; y += 110) {
+            ctx.fillRect(pillarX - 3, y, 6, 8);
+            ctx.fillRect(pillarX - 3, y + 14, 6, 8);
+        }
+
+        // 2. Upper Left High Beam (from Image 1 top-left)
+        const upperLeftY = H * 0.14;
+        const upperLeftStart = W * 0.18;
+        ctx.fillStyle = '#191d2b';
+        ctx.fillRect(upperLeftStart, upperLeftY, pillarX - upperLeftStart, 12);
+        drawSpireSpike(upperLeftStart + 16, upperLeftY, 95, 18);
+        drawSpireSpike(upperLeftStart + (pillarX - upperLeftStart) * 0.45, upperLeftY, 85, 16);
+        drawSpireSpike(upperLeftStart + (pillarX - upperLeftStart) * 0.8, upperLeftY, 90, 16);
+
+        // 3. Middle Right Branching Beam (from Image 1 mid-right)
+        const midRightY = H * 0.42;
+        ctx.fillStyle = '#191d2b';
+        ctx.fillRect(pillarX, midRightY, W - pillarX, 16);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(pillarX, midRightY + 3, W - pillarX, 2.5);
+        drawSpireSpike(pillarX + (W - pillarX) * 0.36, midRightY, H * 0.25, 22);
+        drawSpireSpike(pillarX + (W - pillarX) * 0.78, midRightY, H * 0.34, 24);
+
+        // 4. Main Playable Horizontal Beam (Left of Pillar - Image 1 & 2)
+        const beamThickness = 24;
+
+        // Background tall needle spires rising behind the playable beam (Image 1 iconic silhouette)
+        const beamLen = beamEndX - beamStartX;
+        drawSpireSpike(beamStartX + 14, beamY, H * 0.48, 28);
+        drawSpireSpike(beamStartX + beamLen * 0.34, beamY, H * 0.39, 26);
+        drawSpireSpike(beamStartX + beamLen * 0.63, beamY, H * 0.28, 24);
+
+        // Playable beam body (styled in dark navy + crisp white arcade lines like Cup Pong table)
+        ctx.fillStyle = '#191d2b';
+        ctx.beginPath();
+        ctx.roundRect(beamStartX, beamY, beamLen + pillarW / 2, beamThickness, 6);
+        ctx.fill();
+
+        // Crisp white arcade top track line (Cup Pong court stripe style)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(beamStartX + 8, beamY + 3, beamLen - 12, 4);
+
+        // Glowing red-orange industrial grid cells on the right side of the beam (Image 2 detail)
+        ctx.fillStyle = '#e11d48';
+        const gridStart = beamEndX - beamLen * 0.26;
+        for (let gx = gridStart; gx < beamEndX - 16; gx += 16) {
+            ctx.fillRect(gx, beamY + 10, 12, 4);
+            ctx.fillRect(gx, beamY + 16, 12, 4);
+        }
+
+        // Circular warning lights near the beam junction
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath();
+        ctx.arc(beamEndX - 24, beamY + 12, 4, 0, Math.PI * 2);
+        ctx.arc(beamEndX - 42, beamY + 12, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Draw Samurai (Image 2 center crouching warrior with white robe & spiky hair, rendered in Cup Pong clean vector style)
+    function drawSamurai() {
+        ctx.save();
+        ctx.translate(samurai.x, samurai.y);
+
+        if (samurai.invulnTimer > 0 && Math.floor(samurai.invulnTimer * 15) % 2 === 0) {
+            ctx.globalAlpha = 0.5;
+        }
+
+        const breathe = Math.sin(samurai.animTick) * 2;
+        const isSlashing = samurai.state === 'slash';
+
+        // Shadow on beam
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 32, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.scale(samurai.facing, 1);
+
+        // Wide White Samurai Robe / Hakama (Crouched wide stance from Image 2)
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#191d2b';
+        ctx.lineWidth = 4;
+
+        ctx.beginPath();
+        if (isSlashing) {
+            // Dynamic lunging robe
+            ctx.moveTo(-34, 0);
+            ctx.quadraticCurveTo(-42, -32, -12, -48);
+            ctx.lineTo(24, -48);
+            ctx.quadraticCurveTo(46, -26, 38, 0);
+        } else {
+            // Low wide defensive crouch from Image 2
+            ctx.moveTo(-40, 0);
+            ctx.quadraticCurveTo(-46, -28 + breathe, -18, -42 + breathe);
+            ctx.lineTo(18, -42 + breathe);
+            ctx.quadraticCurveTo(46, -28 + breathe, 40, 0);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner Robe Sash & Fold Lines
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-12, -36 + breathe);
+        ctx.lineTo(4, -12 + breathe);
+        ctx.moveTo(14, -36 + breathe);
+        ctx.lineTo(-4, -12 + breathe);
+        ctx.stroke();
+
+        // Black Wooden Sandals / Feet
+        ctx.fillStyle = '#191d2b';
+        ctx.fillRect(-32, -5, 14, 6);
+        ctx.fillRect(18, -5, 14, 6);
+
+        // Head
+        const headY = isSlashing ? -56 : -48 + breathe;
+        const headX = isSlashing ? 10 : 0;
+
+        // Spiky Black Samurai Topknot Hair (Image 2 iconic silhouette)
+        ctx.fillStyle = '#191d2b';
+        ctx.beginPath();
+        ctx.moveTo(headX - 18, headY - 6);
+        ctx.lineTo(headX - 24, headY - 26);
+        ctx.lineTo(headX - 10, headY - 20);
+        ctx.lineTo(headX - 6, headY - 38);
+        ctx.lineTo(headX + 4, headY - 22);
+        ctx.lineTo(headX + 14, headY - 36);
+        ctx.lineTo(headX + 16, headY - 18);
+        ctx.lineTo(headX + 24, headY - 24);
+        ctx.lineTo(headX + 16, headY - 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // Face
+        ctx.fillStyle = '#fde68a';
+        ctx.strokeStyle = '#191d2b';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.roundRect(headX - 13, headY - 12, 26, 22, 7);
+        ctx.fill();
+        ctx.stroke();
+
+        // Intense Determined Eyes & Brows
+        ctx.fillStyle = '#191d2b';
+        ctx.beginPath();
+        ctx.moveTo(headX - 9, headY - 5);
+        ctx.lineTo(headX - 2, headY - 2);
+        ctx.moveTo(headX + 10, headY - 5);
+        ctx.lineTo(headX + 3, headY - 2);
+        ctx.stroke();
+
+        ctx.fillRect(headX - 7, headY - 2, 4, 4);
+        ctx.fillRect(headX + 4, headY - 2, 4, 4);
+
+        // Katana Sword
+        if (isSlashing) {
+            // Extended gleaming katana slash
+            ctx.save();
+            ctx.translate(headX + 18, headY + 12);
+            ctx.rotate(-0.15);
+
+            // Blade with Cup-Pong lime glow
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.lineTo(88, -8);
+            ctx.lineTo(98, 0);
+            ctx.lineTo(88, 5);
+            ctx.lineTo(0, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Hilt
+            ctx.fillStyle = '#191d2b';
+            ctx.fillRect(-14, -4, 14, 8);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(-2, -9, 4, 18);
+            ctx.restore();
+        } else {
+            // Crouched Hands gripping the beam & sword hilt ready (Image 2 pose)
+            ctx.fillStyle = '#fde68a';
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(-8, -3, 6, 0, Math.PI * 2);
+            ctx.arc(8, -3, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    // Draw Tribal Baboon Warriors (Image 2 left & right characters with white mane, blue/red face markings & twin spears)
+    function drawEnemy(en) {
+        ctx.save();
+        ctx.translate(en.x, en.y);
+        if (en.dead) {
+            ctx.rotate(en.rot);
+        }
+
+        const dir = en.x < samurai.x ? 1 : -1;
+        ctx.scale(dir, 1);
+
+        const bounce = en.dead ? 0 : Math.abs(Math.sin(en.animPhase)) * 5;
+
+        // Wide crouched brown legs (Image 2 monkey warrior stance)
+        ctx.strokeStyle = '#191d2b';
+        ctx.lineWidth = 4;
+        ctx.fillStyle = '#78350f';
+
+        ctx.beginPath();
+        ctx.moveTo(-26, 0);
+        ctx.lineTo(-34, -22 + bounce);
+        ctx.lineTo(-10, -28 + bounce);
+        ctx.lineTo(10, -28 + bounce);
+        ctx.lineTo(34, -22 + bounce);
+        ctx.lineTo(26, 0);
+        ctx.lineTo(16, 0);
+        ctx.lineTo(20, -16 + bounce);
+        ctx.lineTo(-20, -16 + bounce);
+        ctx.lineTo(-16, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Muscular tan torso with tribal markings
+        ctx.fillStyle = '#b4835b';
+        ctx.beginPath();
+        ctx.roundRect(-18, -56 + bounce, 36, 32, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        // White/Cream wild mane (Image 2 baboon mane)
+        ctx.fillStyle = '#e7e5e4';
+        ctx.beginPath();
+        ctx.arc(0, -56 + bounce, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Baboon Mask Face (Dark snout with cyan/red warpaint)
+        ctx.fillStyle = '#191d2b';
+        ctx.beginPath();
+        ctx.roundRect(-10, -64 + bounce, 22, 20, 6);
+        ctx.fill();
+
+        // Glowing Cyan Eyes (like Image 2)
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(-5, -58 + bounce, 5, 4);
+        ctx.fillRect(4, -58 + bounce, 5, 4);
+
+        // Red snout stripe
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(0, -52 + bounce, 4, 7);
+
+        // Arms & Weapons based on Enemy Type
+        if (en.type === 'spearGuard' || en.type === 'thrower') {
+            // Twin Tall Red Tribal Spears (Right warrior in Image 2)
+            ctx.save();
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 3;
+
+            // Left & Right Spears held wide
+            const spearOffsets = [-28, 28];
+            const spearAngles = [-0.28, 0.25];
+
+            for (let s = 0; s < 2; s++) {
+                ctx.save();
+                ctx.translate(spearOffsets[s], -36 + bounce);
+                ctx.rotate(spearAngles[s]);
+
+                // Spear Shaft
+                ctx.fillStyle = '#991b1b';
+                ctx.fillRect(-2.5, -75, 5, 115);
+                ctx.strokeRect(-2.5, -75, 5, 115);
+
+                // Glowing Orange-Red Spearhead
+                ctx.fillStyle = '#ff5722';
+                ctx.beginPath();
+                ctx.moveTo(0, -98);
+                ctx.lineTo(-8, -72);
+                ctx.lineTo(8, -72);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // Shield badge if 2 HP
+            if (en.hp > 1) {
+                ctx.fillStyle = '#38bdf8';
+                ctx.strokeStyle = '#191d2b';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, -38 + bounce, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        } else {
+            // Agile Brawler Arms (Left warrior in Image 2)
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 4;
+            ctx.fillStyle = '#b4835b';
+
+            // Extended clawing arms
+            ctx.beginPath();
+            ctx.roundRect(-36, -50 + bounce, 20, 10, 5);
+            ctx.roundRect(16, -50 + bounce, 22, 10, 5);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function drawEffects() {
+        // Flying Spears
+        spears.forEach(sp => {
+            ctx.save();
+            ctx.translate(sp.x, sp.y);
+            ctx.rotate(sp.vx > 0 ? 0.08 : Math.PI - 0.08);
+            ctx.fillStyle = '#991b1b';
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 2.5;
+            ctx.fillRect(-40, -3, 80, 6);
+            ctx.strokeRect(-40, -3, 80, 6);
+
+            ctx.fillStyle = '#ff5722';
+            ctx.beginPath();
+            ctx.moveTo(55, 0);
+            ctx.lineTo(35, -8);
+            ctx.lineTo(35, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        // Arcade Slash Arcs (Lime & White swoosh inspired by Cup Pong palette)
+        slashArcs.forEach(arc => {
+            const progress = 1 - arc.life / arc.maxLife;
+            ctx.save();
+            ctx.translate(arc.x, arc.y);
+            ctx.scale(arc.dir, 1);
+            ctx.globalAlpha = Math.max(0, arc.life / arc.maxLife);
+
+            ctx.strokeStyle = '#a3e635';
+            ctx.lineWidth = 14 * (1 - progress * 0.5);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(0, 0, 72 + progress * 25, -Math.PI * 0.42, Math.PI * 0.35);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(6, 0, 72 + progress * 25, -Math.PI * 0.35, Math.PI * 0.28);
+            ctx.stroke();
+
+            ctx.restore();
+        });
+
+        // Particles
+        particles.forEach(p => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+            ctx.fillStyle = p.color;
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        });
+
+        // Floating Arcade Callouts
+        floatingTexts.forEach(ft => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife);
+            ctx.font = "800 24px 'Fredoka', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#191d2b';
+            ctx.lineWidth = 6;
+            ctx.strokeText(ft.text, ft.x, ft.y);
+            ctx.fillStyle = ft.color;
+            ctx.fillText(ft.text, ft.x, ft.y);
+            ctx.restore();
+        });
+    }
+
+    // ==========================================
+    // MAIN ANIMATION LOOP
+    // ==========================================
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        update(dt);
+
+        ctx.save();
+        if (screenShake > 0) {
+            const sx = (Math.random() - 0.5) * screenShake;
+            const sy = (Math.random() - 0.5) * screenShake;
+            ctx.translate(sx, sy);
+        }
+
+        drawBackground();
+        drawTowerStructure();
+
+        // Draw Enemies
+        enemies.forEach(drawEnemy);
+
+        // Draw Player Samurai
+        drawSamurai();
+
+        // Draw Slashes, Spears, Particles
+        drawEffects();
+
+        ctx.restore();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = function () {
+        updateHUD();
+        // Spawn two initial enemies flanking the samurai right away to match Image 2!
+        enemies.push({
+            x: beamStartX + 90,
+            y: beamY,
+            vy: 0,
+            vx: 0,
+            side: -1,
+            type: 'brawler',
+            hp: 1,
+            maxHp: 1,
+            speed: 95,
+            stunTimer: 0.6,
+            attackCooldown: 1.5,
+            dead: false,
+            rot: 0,
+            rotSpeed: 0,
+            animPhase: 0
+        });
+        enemies.push({
+            x: beamEndX - 95,
+            y: beamY,
+            vy: 0,
+            vx: 0,
+            side: 1,
+            type: 'spearGuard',
+            hp: 1,
+            maxHp: 1,
+            speed: 90,
+            stunTimer: 0.6,
+            attackCooldown: 1.5,
+            dead: false,
+            rot: 0,
+            rotSpeed: 0,
+            animPhase: 2
+        });
+
+        requestAnimationFrame(gameLoop);
+    };
+</script>
+</body>
+</html>
